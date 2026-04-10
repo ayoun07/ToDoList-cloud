@@ -361,17 +361,17 @@ az webapp log download \
 
 ### **Production**
 ```
-https://todolist-app.azurewebsites.net
+https://todoapp-hka8bmh7c3apede7.spaincentral-01.azurewebsites.net/
 ```
 
 ### **Staging**
 ```
-https://todolist-app-staging.azurewebsites.net
+https://todoapp-staging-cxgqfmgcbwbyd3b4.spaincentral-01.azurewebsites.net
 ```
 
 ### **Blob Storage (Données publiques)**
 ```
-https://todoliststorage.blob.core.windows.net/data/todos.json
+https://todoappstorage789.blob.core.windows.net/todofiles/tasks-export.json
 ```
 
 ---
