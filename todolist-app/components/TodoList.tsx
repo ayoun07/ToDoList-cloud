@@ -1,66 +1,97 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { Todo } from '@/types/todo';
-import { Trash2, Plus, CheckCircle2, Circle } from 'lucide-react';
+import { useState, useEffect } from "react";
+import { Todo } from "@/types/todo";
+import { Trash2, Plus, CheckCircle2, Circle } from "lucide-react";
 
 export default function TodoList() {
   const [todos, setTodos] = useState<Todo[]>([]);
-  const [input, setInput] = useState('');
-  const [mounted, setMounted] = useState(false);
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(true);
 
-  // Charger les tâches depuis le localStorage au montage
   useEffect(() => {
-    const storedTodos = localStorage.getItem('todos');
-    if (storedTodos) {
+    async function loadTodos() {
       try {
-        setTodos(JSON.parse(storedTodos));
+        const response = await fetch("/api/todos");
+        if (!response.ok) {
+          throw new Error("Impossible de charger les tâches");
+        }
+        const data: Todo[] = await response.json();
+        setTodos(data);
       } catch (error) {
-        console.error('Erreur lors du chargement des tâches:', error);
+        console.error("Erreur lors du chargement des tâches :", error);
+      } finally {
+        setLoading(false);
       }
     }
-    setMounted(true);
+
+    loadTodos();
   }, []);
 
-  // Sauvegarder les tâches dans le localStorage
-  useEffect(() => {
-    if (mounted) {
-      localStorage.setItem('todos', JSON.stringify(todos));
+  const addTodo = async () => {
+    if (input.trim() === "") return;
+
+    try {
+      const response = await fetch("/api/todos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: input.trim() }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Impossible d’ajouter la tâche");
+      }
+
+      const createdTodo: Todo = await response.json();
+      setTodos([createdTodo, ...todos]);
+      setInput("");
+    } catch (error) {
+      console.error("Erreur lors de l’ajout de la tâche :", error);
     }
-  }, [todos, mounted]);
-
-  // Ajouter une nouvelle tâche
-  const addTodo = () => {
-    if (input.trim() === '') return;
-
-    const newTodo: Todo = {
-      id: Date.now().toString(),
-      text: input,
-      completed: false,
-      createdAt: new Date(),
-    };
-
-    setTodos([newTodo, ...todos]);
-    setInput('');
   };
 
-  // Basculer l'état d'une tâche
-  const toggleTodo = (id: string) => {
-    setTodos(
-      todos.map((todo) =>
-        todo.id === id ? { ...todo, completed: !todo.completed } : todo
-      )
-    );
+  const toggleTodo = async (id: string) => {
+    const todo = todos.find((todo) => todo.id === id);
+    if (!todo) return;
+
+    try {
+      const response = await fetch("/api/todos", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, completed: !todo.completed }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Impossible de mettre à jour la tâche");
+      }
+
+      const updatedTodo: Todo = await response.json();
+      setTodos(todos.map((item) => (item.id === id ? updatedTodo : item)));
+    } catch (error) {
+      console.error("Erreur lors de la mise à jour de la tâche :", error);
+    }
   };
 
-  // Supprimer une tâche
-  const deleteTodo = (id: string) => {
-    setTodos(todos.filter((todo) => todo.id !== id));
+  const deleteTodo = async (id: string) => {
+    try {
+      const response = await fetch("/api/todos", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Impossible de supprimer la tâche");
+      }
+
+      setTodos(todos.filter((todo) => todo.id !== id));
+    } catch (error) {
+      console.error("Erreur lors de la suppression de la tâche :", error);
+    }
   };
 
-  // Gérer la touche Entrée
   const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
+    if (e.key === "Enter") {
       addTodo();
     }
   };
@@ -68,22 +99,29 @@ export default function TodoList() {
   const completedCount = todos.filter((todo) => todo.completed).length;
   const totalCount = todos.length;
 
-  if (!mounted) {
-    return null;
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-8 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-2xl mx-auto text-center text-gray-600">
+          Chargement des tâches…
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-8 px-4 sm:px-6 lg:px-8">
       <div className="max-w-2xl mx-auto">
-        {/* En-tête */}
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-800 mb-2">Ma Todo List</h1>
-          <p className="text-gray-600">Gérez vos tâches facilement et efficacement</p>
+          <h1 className="text-4xl font-bold text-gray-800 mb-2">
+            Ma Todo List
+          </h1>
+          <p className="text-gray-600">
+            Gérez vos tâches facilement et efficacement
+          </p>
         </div>
 
-        {/* Carte principale */}
         <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
-          {/* Formulaire d'entrée */}
           <div className="flex gap-2 mb-6">
             <input
               type="text"
@@ -102,11 +140,12 @@ export default function TodoList() {
             </button>
           </div>
 
-          {/* Statistiques */}
           {totalCount > 0 && (
             <div className="mb-6 p-4 bg-blue-50 rounded-lg">
               <p className="text-gray-700">
-                <span className="font-semibold">{completedCount}</span> / <span className="font-semibold">{totalCount}</span> tâches complétées
+                <span className="font-semibold">{completedCount}</span> /{" "}
+                <span className="font-semibold">{totalCount}</span> tâches
+                complétées
                 {totalCount > 0 && (
                   <span className="ml-2 text-gray-500">
                     ({Math.round((completedCount / totalCount) * 100)}%)
@@ -116,12 +155,15 @@ export default function TodoList() {
             </div>
           )}
 
-          {/* Liste des tâches */}
           <div className="space-y-2">
             {todos.length === 0 ? (
               <div className="text-center py-12">
-                <p className="text-gray-400 text-lg">Aucune tâche pour le moment</p>
-                <p className="text-gray-300 text-sm">Ajoutez une tâche pour commencer</p>
+                <p className="text-gray-400 text-lg">
+                  Aucune tâche pour le moment
+                </p>
+                <p className="text-gray-300 text-sm">
+                  Ajoutez une tâche pour commencer
+                </p>
               </div>
             ) : (
               todos.map((todo) => (
@@ -129,7 +171,6 @@ export default function TodoList() {
                   key={todo.id}
                   className="flex items-center gap-3 p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors group"
                 >
-                  {/* Bouton de complétion */}
                   <button
                     onClick={() => toggleTodo(todo.id)}
                     className="flex-shrink-0 text-gray-400 hover:text-blue-500 transition-colors"
@@ -141,18 +182,16 @@ export default function TodoList() {
                     )}
                   </button>
 
-                  {/* Texte de la tâche */}
                   <span
                     className={`flex-1 text-lg ${
                       todo.completed
-                        ? 'text-gray-400 line-through'
-                        : 'text-gray-800'
+                        ? "text-gray-400 line-through"
+                        : "text-gray-800"
                     }`}
                   >
                     {todo.text}
                   </span>
 
-                  {/* Bouton de suppression */}
                   <button
                     onClick={() => deleteTodo(todo.id)}
                     className="flex-shrink-0 text-gray-400 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
@@ -165,7 +204,6 @@ export default function TodoList() {
           </div>
         </div>
 
-        {/* Pied de page */}
         {todos.length > 0 && (
           <div className="text-center text-gray-600 text-sm">
             <p>
