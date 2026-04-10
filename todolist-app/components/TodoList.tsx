@@ -1,105 +1,63 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Todo } from "@/types/todo";
-import { Trash2, Plus, CheckCircle2, Circle, AlertCircle } from "lucide-react";
+import { useState, useEffect } from 'react';
+import { Todo } from '@/types/todo';
+import { Trash2, Plus, CheckCircle2, Circle } from 'lucide-react';
 
 export default function TodoList() {
   const [todos, setTodos] = useState<Todo[]>([]);
-  const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [input, setInput] = useState('');
+  const [mounted, setMounted] = useState(false);
 
-  // Charger les tâches depuis l'API au montage
+  // Charger les tâches depuis le localStorage au montage
   useEffect(() => {
-    fetchTodos();
+    const storedTodos = localStorage.getItem('todos');
+    if (storedTodos) {
+      try {
+        setTodos(JSON.parse(storedTodos));
+      } catch (error) {
+        console.error('Erreur lors du chargement des tâches:', error);
+      }
+    }
+    setMounted(true);
   }, []);
 
-  const fetchTodos = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const response = await fetch("/api/todos");
-
-      console.log("Fetch response:", response.status, response.statusText);
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      console.log("Todos fetched:", data);
-      setTodos(data);
-    } catch (err) {
-      console.error("Error fetching todos:", err);
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Erreur lors du chargement des tâches",
-      );
-    } finally {
-      setLoading(false);
+  // Sauvegarder les tâches dans le localStorage
+  useEffect(() => {
+    if (mounted) {
+      localStorage.setItem('todos', JSON.stringify(todos));
     }
-  };
+  }, [todos, mounted]);
 
   // Ajouter une nouvelle tâche
-  const addTodo = async () => {
-    if (input.trim() === "") return;
+  const addTodo = () => {
+    if (input.trim() === '') return;
 
-    try {
-      const response = await fetch("/api/todos", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: input }),
-      });
+    const newTodo: Todo = {
+      id: Date.now().toString(),
+      text: input,
+      completed: false,
+      createdAt: new Date(),
+    };
 
-      if (!response.ok) throw new Error("Erreur lors de l'ajout");
-      const newTodo = await response.json();
-      setTodos([newTodo, ...todos]);
-      setInput("");
-    } catch (err) {
-      console.error("Error adding todo:", err);
-      setError("Impossible d'ajouter la tâche");
-    }
+    setTodos([newTodo, ...todos]);
+    setInput('');
   };
 
   // Basculer l'état d'une tâche
-  const toggleTodo = async (id: string) => {
-    const todo = todos.find((t) => t.id === id);
-    if (!todo) return;
-
-    try {
-      const response = await fetch(`/api/todos/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ completed: !todo.completed }),
-      });
-
-      if (!response.ok) throw new Error("Erreur lors de la mise à jour");
-      const updatedTodo = await response.json();
-      setTodos(todos.map((t) => (t.id === id ? updatedTodo : t)));
-    } catch (err) {
-      console.error("Error toggling todo:", err);
-      setError("Impossible de mettre à jour la tâche");
-    }
+  const toggleTodo = (id: string) => {
+    setTodos(
+      todos.map((todo) =>
+        todo.id === id ? { ...todo, completed: !todo.completed } : todo
+      )
+    );
   };
 
   // Supprimer une tâche
-  const deleteTodo = async (id: string) => {
-    try {
-      const response = await fetch(`/api/todos/${id}`, {
-        method: "DELETE",
-      });
-
-      if (!response.ok) throw new Error("Erreur lors de la suppression");
-      setTodos(todos.filter((todo) => todo.id !== id));
-    } catch (err) {
-      console.error("Error deleting todo:", err);
-      setError("Impossible de supprimer la tâche");
-    }
+  const deleteTodo = (id: string) => {
+    setTodos(todos.filter((todo) => todo.id !== id));
   };
 
-  // Gérer la touche Entrée
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") {
       addTodo();
@@ -109,20 +67,13 @@ export default function TodoList() {
   const completedCount = todos.filter((todo) => todo.completed).length;
   const totalCount = todos.length;
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-8 px-4 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-gray-600 text-lg">Chargement des tâches...</p>
-        </div>
-      </div>
-    );
+  if (!mounted) {
+    return null;
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-8 px-4 sm:px-6 lg:px-8">
       <div className="max-w-2xl mx-auto">
-        {/* En-tête */}
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-gray-800 mb-2">
             Ma Todo List
@@ -140,9 +91,7 @@ export default function TodoList() {
           </div>
         )}
 
-        {/* Carte principale */}
         <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
-          {/* Formulaire d'entrée */}
           <div className="flex gap-2 mb-6">
             <input
               type="text"
@@ -161,7 +110,6 @@ export default function TodoList() {
             </button>
           </div>
 
-          {/* Statistiques */}
           {totalCount > 0 && (
             <div className="mb-6 p-4 bg-blue-50 rounded-lg">
               <p className="text-gray-700">
@@ -177,7 +125,6 @@ export default function TodoList() {
             </div>
           )}
 
-          {/* Liste des tâches */}
           <div className="space-y-2">
             {todos.length === 0 ? (
               <div className="text-center py-12">
@@ -194,7 +141,6 @@ export default function TodoList() {
                   key={todo.id}
                   className="flex items-center gap-3 p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors group"
                 >
-                  {/* Bouton de complétion */}
                   <button
                     onClick={() => toggleTodo(todo.id)}
                     className="flex-shrink-0 text-gray-400 hover:text-blue-500 transition-colors"
@@ -206,7 +152,6 @@ export default function TodoList() {
                     )}
                   </button>
 
-                  {/* Texte de la tâche */}
                   <span
                     className={`flex-1 text-lg ${
                       todo.completed
@@ -217,7 +162,6 @@ export default function TodoList() {
                     {todo.text}
                   </span>
 
-                  {/* Bouton de suppression */}
                   <button
                     onClick={() => deleteTodo(todo.id)}
                     className="flex-shrink-0 text-gray-400 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
@@ -230,7 +174,6 @@ export default function TodoList() {
           </div>
         </div>
 
-        {/* Pied de page */}
         {todos.length > 0 && (
           <div className="text-center text-gray-600 text-sm">
             <p>
